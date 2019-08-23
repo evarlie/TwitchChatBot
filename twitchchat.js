@@ -3,7 +3,8 @@ const fs = require('fs');
 var player = require('play-sound')(opts = {player: "mplayer64/mplayer.exe"})
 var command;
 var queue;
-var perm;
+var delay = 0;
+var perm = false;
 
 function jsonReader(filePath, cb) { //https://medium.com/@osiolabs/read-write-json-files-with-node-js-92d03cc82824
     fs.readFile(filePath, (err, fileData) => {
@@ -34,9 +35,6 @@ jsonReader('./queue.json', (err, que) => {
     queue = que;
 })
 
-
-
-//./commands.json'
 // Define configuration options
 const options = {
   identity: {
@@ -61,12 +59,11 @@ client.connect();
 // Called every time a message comes in
 function onMessageHandler (target, context, msg, self) {
   if (self) { return; } // Ignore messages from the bot
-//console.log(context.mod);
+
   // Remove whitespace from chat message
   const commandName = msg.trim();
 
   // If the command is known, let's execute it
-//console.log(commandName.substring(0,7))
   if (commandName.substring(0, 8) === '!addcom ' && (context.mod == true || context.username == 'username')) {
       var com = commandName.slice(8);
       var i;
@@ -96,7 +93,7 @@ function onMessageHandler (target, context, msg, self) {
       console.log(jsonString)
   }
 
-  if (commandName.substring(0, 9) === '!editcom ' && (context.mod == true || context.username == 'username')) {
+  if (commandName.substring(0, 9) === '!editcom ' && (context.badges.broadcaster == '1' || context.badges.moderator == '1')) {
       var com = commandName.slice(9);
       var i;
       var keycom;
@@ -130,7 +127,7 @@ function onMessageHandler (target, context, msg, self) {
       console.log(jsonString)
   }
 
-  if (commandName.substring(0, 8) === '!delcom '  && (context.mod == true || context.username == 'username')) {
+  if (commandName.substring(0, 8) === '!delcom '  && (context.badges.broadcaster == '1' || context.badges.moderator == '1')) {
       var com = commandName.slice(8);
       console.log(com);
       var i;
@@ -152,7 +149,7 @@ function onMessageHandler (target, context, msg, self) {
         {
           console.log(com, " ", command.commands[j].key)
           command.commands.splice(j,1);
-          //delete command.commands[j];
+
           break;
         }
       }
@@ -166,7 +163,6 @@ function onMessageHandler (target, context, msg, self) {
 
       console.log(jsonString)
 
-      //commandName.split(' ').join('')
   }
 
   if(commandName == '!queue'){
@@ -189,7 +185,7 @@ function onMessageHandler (target, context, msg, self) {
     console.log(`* Executed ${commandName} command`);
   }
 
-  if(commandName == '!next' && (context.mod == true || context.username == 'username')){
+  if(commandName == '!next' && (context.badges.broadcaster == '1' || context.badges.moderator == '1')){
     if(queue.users.length > 1)
     {
       console.log(queue.users[0].person)
@@ -278,33 +274,96 @@ function onMessageHandler (target, context, msg, self) {
   }
 
   else {
-    try {
-      var comValues = readCommand(commandName);
-      var comReturn = comValues[0];
-      var soundReturn = comValues[1];
       try {
-        soundString = 'sounds/' + soundReturn;
-        player.play(soundString, function(err){
-        if (err) throw err
-        })
+        var comValues = readCommand(commandName);
+        var comReturn = comValues[0];
+        var soundReturn = comValues[1];
+        var permReturn = comValues[2];
+
+        if(permReturn != null)
+        {
+          if(context.badges.subscriber == '3')
+          {
+            if(permReturn == '1' || permReturn == '2' || permReturn == '3')
+            {
+              perm = true;
+            }
+          }
+          else if(context.badges.subscriber == '2')
+          {
+            if(permReturn == '1' || permReturn == '2')
+            {
+              perm = true;
+            }
+          }
+          else if(context.badges.subscriber == '1')
+          {
+            if(permReturn == '1')
+            {
+              perm = true;
+            }
+          }
+          else
+          {
+            perm = false;
+          }
+        }
+        else
+          {
+            perm = true;
+          }
+
+        if(delay == 0 && soundReturn != null && perm == true)
+        {
+          try {
+
+            soundString = 'sounds/' + soundReturn;
+            player.play(soundString, function(err){
+            if (err) throw err
+            })
+            init();
+          }
+          catch(e)
+          {
+            console.log("No sound file")
+          }
+        }
+        else if(delay == 1) {
+            comReturn = "Sorry, the sound alerts are on cooldown..."
+        }
+        else if(perm = false)
+        {
+            comReturn = "Sorry, you must be a tier" + permReturn + " subscriber to use that command."
+            return;
+        }
+
+        if((comReturn == "falsecommand")){
+          console.log("Command not found");
+          return;
+        }
+
+        client.say(target, comReturn);
+        console.log(`* Executed ${commandName} command`);
       }
-      catch(e)
-      {
-        console.log("No sound file")
-      }
-      if(comReturn == "falsecommand" && soundReturn == null){
-        console.log("Command not found");
-        return;
+      catch(err){
+        console.log("command read error: ", err);
       }
 
-      client.say(target, comReturn);
-      console.log(`* Executed ${commandName} command`);
     }
-    catch(err){
-      console.log("command read error: ", err);
-    }
+}
 
-  }
+async function init(){
+   console.log("sound delay start")
+   delay = 1
+   await sleep(15000)
+   console.log("sound delay stop")
+   delay = 0;
+}
+
+function sleep(ms){
+    return new Promise(resolve=>{
+        setTimeout(resolve,ms)
+    })
 }
 
 function readCommand (com) {
@@ -318,7 +377,7 @@ function readCommand (com) {
   {
     if (command.commands[i].key == fixCom)
     {
-      return [command.commands[i].result, command.commands[i].soundfile];
+      return [command.commands[i].result, command.commands[i].soundfile, command.commands[i].permission];
     }
   }
   return ["falsecommand"]

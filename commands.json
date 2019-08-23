@@ -1,1 +1,1 @@
-{"commands":[{"key":"test","result":"This is a test message!", "soundfile": "beep.mp3"}, {"key":"test2","result":"This is the second test message!"}]}
+{"commands":[{"key":"test","result":"This is a test message!", "soundfile": "beep.mp3", "permission":"1"}, {"key":"test2","result":"This is the second test message!"}]}
